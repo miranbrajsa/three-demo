@@ -9,10 +9,13 @@ uniform mat4 uModelViewMatrix;
 uniform mat4 uProjectionMatrix;
 
 out vec4 vColor;
+out vec2 vUv;
 
 void main() {
     gl_Position = uProjectionMatrix * uModelViewMatrix * aPosition;
     vColor = aColor;
+    // Generate UV coordinates based on position
+    vUv = aPosition.xy * 0.5 + 0.5;
 }
 `;
 
@@ -21,6 +24,7 @@ const fragmentShaderSource = `#version 300 es
 precision highp float;
 
 in vec4 vColor;
+in vec2 vUv;
 out vec4 fragColor;
 
 /* BEGIN_ADDITIONAL_UNIFORMS */
@@ -38,6 +42,32 @@ vec4 applyColorCorrection(vec4 inputColor) {
 void main() {
     fragColor = applyColorCorrection(vColor);
 }`;
+
+// Create and compile shader
+function createShader(gl, type, source) {
+    const shader = gl.createShader(type);
+    if (!shader) {
+        console.error('Failed to create shader');
+        return null;
+    }
+
+    // Log the shader source for debugging
+    console.log('Compiling shader:', type === gl.VERTEX_SHADER ? 'VERTEX' : 'FRAGMENT');
+    console.log('Shader source:', source);
+
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        const error = gl.getShaderInfoLog(shader);
+        console.error('Shader compilation error:', error);
+        console.error('Shader type:', type === gl.VERTEX_SHADER ? 'VERTEX' : 'FRAGMENT');
+        console.error('Shader source:', source);
+        gl.deleteShader(shader);
+        return null;
+    }
+    return shader;
+}
 
 // Create and compile shader with customizations
 function createShaderWithCustomizations(gl, type, source, customizations = {}) {
@@ -79,26 +109,11 @@ ${colorCorrectionFunction.trim()}
     }
 
     // Debug log the final shader source
-    console.log('Final shader source:', customizedSource);
+    console.log('Final customized shader source:', customizedSource);
 
     const shader = createShader(gl, type, customizedSource);
     if (!shader) {
-        console.error('Shader compilation failed. Source:', customizedSource);
-    }
-    return shader;
-}
-
-// Create and compile shader
-function createShader(gl, type, source) {
-    const shader = gl.createShader(type);
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        const error = gl.getShaderInfoLog(shader);
-        console.error('Shader compilation error:', error);
-        console.error('Shader source:', source);
-        gl.deleteShader(shader);
+        console.error('Shader compilation failed. Type:', type === gl.VERTEX_SHADER ? 'VERTEX' : 'FRAGMENT');
         return null;
     }
     return shader;
@@ -121,11 +136,29 @@ function createProgram(gl, vertexShader, fragmentShader) {
 
 // Initialize WebGL context with customizations
 export function initWebGL(gl, camera, shaderCustomizations = {}) {
+    console.log('Initializing WebGL with customizations:', shaderCustomizations);
+    
     // Create shaders with customizations
     const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+    if (!vertexShader) {
+        console.error('Failed to create vertex shader');
+        return null;
+    }
+
     const fragmentShader = createShaderWithCustomizations(gl, gl.FRAGMENT_SHADER, fragmentShaderSource, shaderCustomizations);
+    if (!fragmentShader) {
+        console.error('Failed to create fragment shader');
+        gl.deleteShader(vertexShader);
+        return null;
+    }
+
     const program = createProgram(gl, vertexShader, fragmentShader);
-    if (!program) return null;
+    if (!program) {
+        console.error('Failed to create program');
+        gl.deleteShader(vertexShader);
+        gl.deleteShader(fragmentShader);
+        return null;
+    }
 
     // Get attribute and uniform locations
     const positionLocation = gl.getAttribLocation(program, 'aPosition');

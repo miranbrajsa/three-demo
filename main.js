@@ -51,37 +51,92 @@ const controls = new OrbitControls(camera, renderer.domElement);
 // Initialize WebGL cube with custom shader code
 const shaderCustomizations = {
     additionalUniforms: `
-        uniform float uTime;
-        uniform vec3 uColorModifier;
+        uniform float uBrightness;
+        uniform float uContrast;
+        uniform float uSaturation;
+        uniform float uTemperature;
+        uniform float uLowTonePosition;
+        uniform float uMidTonePosition;
+        uniform float uHighTonePosition;
+        uniform bool applyColorLevels;
     `,
     additionalFunctions: `
-        float wave(float x) {
-            return sin(x * 3.14159) * 0.5 + 0.5;
+        vec3 temperatureToRGB(float kelvin) {
+            kelvin = clamp(kelvin, 1000.0, 40000.0) / 100.0;
+            float red = kelvin <= 66.0 ? 1.0 : clamp(1.292936186062745 * pow(kelvin - 60.0, -0.1332047592), 0.0, 1.0);
+            float green = kelvin <= 66.0
+                ? clamp(0.39008157876901960784 * log(kelvin) - 0.63184144378862745098, 0.0, 1.0)
+                : clamp(1.129890860895294 * pow(kelvin - 60.0, -0.0755148492), 0.0, 1.0);
+            float blue = kelvin >= 66.0 ? 1.0 : (kelvin <= 19.0 ? 0.0 : clamp(0.54320678911019607843 * log(kelvin - 10.0) - 1.19625408914, 0.0, 1.0));
+            return vec3(red, green, blue);
+        }
+
+        vec3 applyLevels(vec3 color, float low, float mid, float high) {
+            low = clamp(low, 0.0, 1.0);
+            high = clamp(high, low + 0.01, 1.0);
+            mid = clamp(mid, 0.01, 1.0);
+
+            color = clamp((color - low) / (high - low), 0.0, 1.0);
+            color = pow(color, vec3(1.0 - mid));
+
+            return color;
         }
     `,
     colorCorrectionFunction: `
         vec4 applyColorCorrection(vec4 inputColor) {
-            float t = uTime * 0.001; // Convert to seconds
-            float waveValue = wave(t + inputColor.r * 2.0);
-            vec3 modifiedColor = inputColor.rgb * uColorModifier;
-            return vec4(modifiedColor * waveValue, inputColor.a);
+            vec4 modifiedInputColor = inputColor;
+
+            modifiedInputColor.rgb += uBrightness;
+            modifiedInputColor.rgb = (modifiedInputColor.rgb - 0.5) * uContrast + 0.5;
+
+            float luminance = 0.2126 * modifiedInputColor.r + 0.7152 * modifiedInputColor.g + 0.0722 * modifiedInputColor.b;
+            modifiedInputColor.rgb = mix(vec3(luminance), modifiedInputColor.rgb, uSaturation);
+
+            vec3 tempRGB = temperatureToRGB(uTemperature);
+            modifiedInputColor.rgb *= tempRGB;
+
+            if (applyColorLevels) {
+                modifiedInputColor.rgb = applyLevels(modifiedInputColor.rgb, uLowTonePosition, uMidTonePosition, uHighTonePosition);
+            }
+
+            return modifiedInputColor;
         }
     `
 };
 
-// const cubeState = initWebGL(context, camera);
+// Initialize WebGL cube with custom shader code
 const cubeState = initWebGL(context, camera, shaderCustomizations);
 if (!cubeState) {
     console.error('Failed to initialize WebGL cube');
 }
 
-// Add time uniform to cube state
+// Add uniforms to cube state
 if (cubeState) {
-    cubeState.timeLocation = context.getUniformLocation(cubeState.program, 'uTime');
-    cubeState.colorModifierLocation = context.getUniformLocation(cubeState.program, 'uColorModifier');
-    // Set initial color modifier
+    // Get uniform locations
+    const uniforms = {
+        brightness: context.getUniformLocation(cubeState.program, 'uBrightness'),
+        contrast: context.getUniformLocation(cubeState.program, 'uContrast'),
+        saturation: context.getUniformLocation(cubeState.program, 'uSaturation'),
+        temperature: context.getUniformLocation(cubeState.program, 'uTemperature'),
+        lowTone: context.getUniformLocation(cubeState.program, 'uLowTonePosition'),
+        midTone: context.getUniformLocation(cubeState.program, 'uMidTonePosition'),
+        highTone: context.getUniformLocation(cubeState.program, 'uHighTonePosition'),
+        applyLevels: context.getUniformLocation(cubeState.program, 'applyColorLevels')
+    };
+
+    // Set initial uniform values
     context.useProgram(cubeState.program);
-    context.uniform3f(cubeState.colorModifierLocation, 1.2, 0.8, 1.0);
+    context.uniform1f(uniforms.brightness, 0.0);
+    context.uniform1f(uniforms.contrast, 1.0);
+    context.uniform1f(uniforms.saturation, 1.13);
+    context.uniform1f(uniforms.temperature, 6500.0);
+    context.uniform1f(uniforms.lowTone, 0.016);
+    context.uniform1f(uniforms.midTone, 0.418);
+    context.uniform1f(uniforms.highTone, 0.984);
+    context.uniform1i(uniforms.applyLevels, 1);
+
+    // Store uniforms in cube state
+    cubeState.uniforms = uniforms;
 }
 
 // animation loop
