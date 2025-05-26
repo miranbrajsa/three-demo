@@ -51,10 +51,6 @@ function createShader(gl, type, source) {
         return null;
     }
 
-    // Log the shader source for debugging
-    console.log('Compiling shader:', type === gl.VERTEX_SHADER ? 'VERTEX' : 'FRAGMENT');
-    console.log('Shader source:', source);
-
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
 
@@ -69,7 +65,6 @@ function createShader(gl, type, source) {
     return shader;
 }
 
-// Create and compile shader with customizations
 function createShaderWithCustomizations(gl, type, source, customizations = {}) {
     const {
         additionalUniforms,
@@ -79,7 +74,6 @@ function createShaderWithCustomizations(gl, type, source, customizations = {}) {
 
     let customizedSource = source;
 
-    // Only replace if custom values are provided
     if (additionalUniforms !== undefined) {
         const uniformSection = `/* BEGIN_ADDITIONAL_UNIFORMS */
 ${additionalUniforms.trim()}
@@ -108,9 +102,6 @@ ${colorCorrectionFunction.trim()}
         );
     }
 
-    // Debug log the final shader source
-    console.log('Final customized shader source:', customizedSource);
-
     const shader = createShader(gl, type, customizedSource);
     if (!shader) {
         console.error('Shader compilation failed. Type:', type === gl.VERTEX_SHADER ? 'VERTEX' : 'FRAGMENT');
@@ -134,11 +125,7 @@ function createProgram(gl, vertexShader, fragmentShader) {
     return program;
 }
 
-// Initialize WebGL context with customizations
 export function initWebGL(gl, camera, shaderCustomizations = {}) {
-    console.log('Initializing WebGL with customizations:', shaderCustomizations);
-    
-    // Create shaders with customizations
     const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
     if (!vertexShader) {
         console.error('Failed to create vertex shader');

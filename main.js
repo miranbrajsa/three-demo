@@ -3,9 +3,6 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Splatter } from 'splatter-three';
 import { initWebGL, renderWebGLCube } from './cube.js';
 
-// set world up direction
-THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
-
 // create WebGL2 context -- required for Splatter
 const options = {
     antialias: false,
@@ -28,14 +25,12 @@ renderer.setClearColor(0x102030);
 
 // set up Splatter
 const splatter = new Splatter(context, {splatId: 'fmd-iuw'});
-splatter.setPixelRatio(1); // render splats at CSS pixels for better performance
-//splatter.setPixelRatio(window.devicePixelRatio); // render at device pixels for highest quality
+splatter.setTransform(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
 
 // set up scene
 const scene = new THREE.Scene();
 
 const gridHelper = new THREE.GridHelper(10, 10);
-gridHelper.rotation.x = Math.PI / 2;
 scene.add(gridHelper);
 
 const light = new THREE.DirectionalLight(0xffffff, 1);
@@ -58,7 +53,7 @@ const shaderCustomizations = {
         uniform float uLowTonePosition;
         uniform float uMidTonePosition;
         uniform float uHighTonePosition;
-        uniform bool applyColorLevels;
+        uniform bool uApplyColorLevels;
     `,
     additionalFunctions: `
         vec3 temperatureToRGB(float kelvin) {
@@ -95,7 +90,7 @@ const shaderCustomizations = {
             vec3 tempRGB = temperatureToRGB(uTemperature);
             modifiedInputColor.rgb *= tempRGB;
 
-            if (applyColorLevels) {
+            if (uApplyColorLevels) {
                 modifiedInputColor.rgb = applyLevels(modifiedInputColor.rgb, uLowTonePosition, uMidTonePosition, uHighTonePosition);
             }
 
@@ -121,7 +116,7 @@ if (cubeState) {
         lowTone: context.getUniformLocation(cubeState.program, 'uLowTonePosition'),
         midTone: context.getUniformLocation(cubeState.program, 'uMidTonePosition'),
         highTone: context.getUniformLocation(cubeState.program, 'uHighTonePosition'),
-        applyLevels: context.getUniformLocation(cubeState.program, 'applyColorLevels')
+        applyLevels: context.getUniformLocation(cubeState.program, 'uApplyColorLevels')
     };
 
     // Set initial uniform values
@@ -133,7 +128,7 @@ if (cubeState) {
     context.uniform1f(uniforms.lowTone, 0.016);
     context.uniform1f(uniforms.midTone, 0.418);
     context.uniform1f(uniforms.highTone, 0.984);
-    context.uniform1i(uniforms.applyLevels, 1);
+    context.uniform1i(uniforms.applyLevels, true);
 
     // Store uniforms in cube state
     cubeState.uniforms = uniforms;
