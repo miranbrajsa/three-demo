@@ -31,24 +31,13 @@ out vec4 fragColor;
 
 /* BEGIN_COLOR_CORRECTION */
 vec4 applyColorCorrection(vec4 inputColor) {
-    return vec4(inputColor.rgb * 0.1, inputColor.a);
+    return inputColor;
 }
 /* END_COLOR_CORRECTION */
 
 void main() {
     fragColor = applyColorCorrection(vColor);
 }`;
-
-// Default shader customizations
-const defaultShaderCustomizations = {
-    additionalUniforms: '',
-    additionalFunctions: '',
-    colorCorrectionFunction: `
-        vec4 applyColorCorrection(vec4 inputColor) {
-            return vec4(inputColor.rgb * 0.1, inputColor.a);
-        }
-    `
-};
 
 // Create and compile shader with customizations
 function createShaderWithCustomizations(gl, type, source, customizations = {}) {
